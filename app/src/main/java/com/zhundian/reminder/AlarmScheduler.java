@@ -8,8 +8,8 @@ import android.app.PendingIntent;
 import android.content.Context;
 import android.content.Intent;
 import android.content.SharedPreferences;
+import android.graphics.drawable.Icon;
 import android.os.Build;
-import android.media.RingtoneManager;
 
 import org.json.JSONArray;
 import org.json.JSONObject;
@@ -18,10 +18,12 @@ import java.util.ArrayList;
 import java.util.List;
 
 public final class AlarmScheduler {
-    public static final String CHANNEL_ID = "zhundian-reminders";
+    public static final String CHANNEL_ID = "zhundian-reminders-v3";
     public static final String ACTION_REMINDER = "com.zhundian.reminder.ACTION_REMINDER";
+    public static final String ACTION_STOP = "com.zhundian.reminder.ACTION_STOP";
     private static final String PREFS_NAME = "zhundian_alarms";
     private static final String KEY_ALARMS = "alarms";
+    private static final long[] LONG_VIBRATION_PATTERN = createLongVibrationPattern();
 
     private AlarmScheduler() {
     }
@@ -115,6 +117,16 @@ public final class AlarmScheduler {
             PendingIntent.FLAG_UPDATE_CURRENT | PendingIntent.FLAG_IMMUTABLE
         );
 
+        Intent stopIntent = new Intent(context, ReminderReceiver.class);
+        stopIntent.setAction(ACTION_STOP);
+        stopIntent.putExtra("notificationId", notificationId);
+        PendingIntent stopPendingIntent = PendingIntent.getBroadcast(
+            context,
+            notificationId + 100000,
+            stopIntent,
+            PendingIntent.FLAG_UPDATE_CURRENT | PendingIntent.FLAG_IMMUTABLE
+        );
+
         Notification.Builder builder = Build.VERSION.SDK_INT >= Build.VERSION_CODES.O
             ? new Notification.Builder(context, CHANNEL_ID)
             : new Notification.Builder(context);
@@ -127,8 +139,16 @@ public final class AlarmScheduler {
             .setAutoCancel(true)
             .setContentIntent(contentIntent)
             .setPriority(Notification.PRIORITY_HIGH)
-            .setCategory(Notification.CATEGORY_REMINDER)
-            .setVisibility(Notification.VISIBILITY_PUBLIC);
+            .setCategory(Notification.CATEGORY_ALARM)
+            .setVisibility(Notification.VISIBILITY_PUBLIC)
+            .setFullScreenIntent(contentIntent, true)
+            .setDeleteIntent(stopPendingIntent)
+            .setVibrate(LONG_VIBRATION_PATTERN)
+            .addAction(new Notification.Action.Builder(
+                Icon.createWithResource(context, R.drawable.ic_stat_reminder),
+                "停止震动",
+                stopPendingIntent
+            ).build());
 
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
             builder.setColor(0xFFF26F4F);
@@ -145,10 +165,22 @@ public final class AlarmScheduler {
         );
         channel.setDescription(context.getString(R.string.notification_channel_description));
         channel.enableVibration(true);
-        channel.setVibrationPattern(new long[]{0, 260, 120, 260, 120, 480});
-        channel.setSound(RingtoneManager.getDefaultUri(RingtoneManager.TYPE_NOTIFICATION), null);
+        channel.setVibrationPattern(LONG_VIBRATION_PATTERN);
+        channel.setSound(null, null);
         NotificationManager notificationManager = (NotificationManager) context.getSystemService(Context.NOTIFICATION_SERVICE);
         notificationManager.createNotificationChannel(channel);
+    }
+
+    private static long[] createLongVibrationPattern() {
+        long[] pattern = new long[151];
+        pattern[0] = 0L;
+        int index = 1;
+        for (int cycle = 0; cycle < 75; cycle += 1) {
+            pattern[index] = 600L;
+            pattern[index + 1] = 200L;
+            index += 2;
+        }
+        return pattern;
     }
 
     private static int notificationId(String taskId) {

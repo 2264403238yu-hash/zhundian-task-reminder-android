@@ -5,10 +5,19 @@ import android.content.Context;
 import android.content.Intent;
 import android.app.Notification;
 import android.app.NotificationManager;
+import android.os.Vibrator;
 
 public class ReminderReceiver extends BroadcastReceiver {
     @Override
     public void onReceive(Context context, Intent intent) {
+        if (AlarmScheduler.ACTION_STOP.equals(intent.getAction())) {
+            int stopId = intent.getIntExtra("notificationId", 0);
+            NotificationManager stopManager = (NotificationManager) context.getSystemService(Context.NOTIFICATION_SERVICE);
+            stopManager.cancel(stopId);
+            Vibrator vibrator = (Vibrator) context.getSystemService(Context.VIBRATOR_SERVICE);
+            if (vibrator != null) vibrator.cancel();
+            return;
+        }
         if (!AlarmScheduler.ACTION_REMINDER.equals(intent.getAction())) return;
         String taskId = intent.getStringExtra("taskId");
         String title = intent.getStringExtra("title");
